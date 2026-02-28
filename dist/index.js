@@ -53,23 +53,28 @@ const aggregateUserInfo = (response) => {
     }));
     const contributesLanguage = {};
     user.contributionsCollection.commitContributionsByRepository
-        .filter((repo) => repo.repository.primaryLanguage)
+        .filter((repo) => repo.repository.languages.edges.length > 0)
         .forEach((repo) => {
-        var _a, _b;
-        const language = ((_a = repo.repository.primaryLanguage) === null || _a === void 0 ? void 0 : _a.name) || '';
-        const color = ((_b = repo.repository.primaryLanguage) === null || _b === void 0 ? void 0 : _b.color) || OTHER_COLOR;
+        const edges = repo.repository.languages.edges;
+        const totalSize = edges.reduce((sum, edge) => sum + edge.size, 0);
         const contributions = repo.contributions.totalCount;
-        const info = contributesLanguage[language];
-        if (info) {
-            info.contributions += contributions;
-        }
-        else {
-            contributesLanguage[language] = {
-                language: language,
-                color: color,
-                contributions: contributions,
-            };
-        }
+        edges.forEach((edge) => {
+            const language = edge.node.name;
+            const color = edge.node.color || OTHER_COLOR;
+            const ratio = edge.size / totalSize;
+            const langContributions = contributions * ratio;
+            const info = contributesLanguage[language];
+            if (info) {
+                info.contributions += langContributions;
+            }
+            else {
+                contributesLanguage[language] = {
+                    language: language,
+                    color: color,
+                    contributions: langContributions,
+                };
+            }
+        });
     });
     const languages = Object.values(contributesLanguage).sort((obj1, obj2) => -compare(obj1.contributions, obj2.contributions));
     const totalForkCount = user.repositories.nodes
@@ -1071,9 +1076,14 @@ const fetchFirst = async (token, userName, year = null) => {
                         }
                         commitContributionsByRepository(maxRepositories: ${maxReposOneQuery}) {
                             repository {
-                                primaryLanguage {
-                                    name
-                                    color
+                                languages(first: 10, orderBy: {field: SIZE, direction: DESC}) {
+                                    edges {
+                                        size
+                                        node {
+                                            name
+                                            color
+                                        }
+                                    }
                                 }
                             }
                             contributions {
