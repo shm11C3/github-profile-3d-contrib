@@ -51,22 +51,29 @@ export const aggregateUserInfo = (
         }));
     const contributesLanguage: { [language: string]: type.LangInfo } = {};
     user.contributionsCollection.commitContributionsByRepository
-        .filter((repo) => repo.repository.primaryLanguage)
+        .filter((repo) => repo.repository.languages.edges.length > 0)
         .forEach((repo) => {
-            const language = repo.repository.primaryLanguage?.name || '';
-            const color = repo.repository.primaryLanguage?.color || OTHER_COLOR;
+            const edges = repo.repository.languages.edges;
+            const totalSize = edges.reduce((sum, edge) => sum + edge.size, 0);
             const contributions = repo.contributions.totalCount;
 
-            const info = contributesLanguage[language];
-            if (info) {
-                info.contributions += contributions;
-            } else {
-                contributesLanguage[language] = {
-                    language: language,
-                    color: color,
-                    contributions: contributions,
-                };
-            }
+            edges.forEach((edge) => {
+                const language = edge.node.name;
+                const color = edge.node.color || OTHER_COLOR;
+                const ratio = edge.size / totalSize;
+                const langContributions = contributions * ratio;
+
+                const info = contributesLanguage[language];
+                if (info) {
+                    info.contributions += langContributions;
+                } else {
+                    contributesLanguage[language] = {
+                        language: language,
+                        color: color,
+                        contributions: langContributions,
+                    };
+                }
+            });
         });
     const languages: Array<type.LangInfo> = Object.values(
         contributesLanguage,
